@@ -305,7 +305,7 @@ int main(int argc, char * argv[])
 {
     int i, j, k, num;
     char path[PATH_MAX + 1];
-    char param[32];     //保存命令行参数，目标文件名和目录名不再此列
+    char param[32];     //保存命令行参数，目标文件名和目录名不在此列
     int flag_param = PARAM_NONE;    //参数种类，即是否有-l和-a选项
     struct stat buf;
 
