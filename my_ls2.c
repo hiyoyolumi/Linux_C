@@ -58,8 +58,11 @@ void qsort_string(char **num, int order[], int start, int finish)
     qsort_string(num, order, left, finish-1);
 }
 
-void display_R(struct stat buf, int flag_param, char *path)
+void display_R(int flag_param, char *path)
 {
+    struct stat buf;
+    lstat(path, &buf);
+    
     if(S_ISDIR(buf.st_mode))    //如果该目录中有一个目录的话 递归回display_dir
     {
         display_dir(flag_param, path);
@@ -267,7 +270,7 @@ void display(int flag, char * pathname)
 
 
     case PARAM_R:
-        display_R(buf, flag, pathname);
+        display_R(flag, pathname);
         break;
 
 
