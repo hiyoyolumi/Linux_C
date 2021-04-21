@@ -16,8 +16,8 @@
 
 void print_prompt();
 void get_input(char *);
-void explain_input(char *, int *, char a[][]);
-void do_cmd(int, char a[][]);
+void explain_input(char *, int *, char a[][256]);
+void do_cmd(int, char a[][256]);
 int find_command(char *);
 
 int main(int argc, char **argv)
@@ -304,7 +304,7 @@ void do_cmd(int argcount, char arglist[100][256])
                     printf("%s : command not found\n", arg[0]);
                     exit(0);
                 }
-                fd = opne(file, O_RDONLY);
+                fd = open(file, O_RDONLY);
                 dup2(fd, 0);
                 execvp(arg[0], arg);
                 exit(0);
@@ -330,7 +330,7 @@ void do_cmd(int argcount, char arglist[100][256])
                         printf("%s : command not found\n", arg[0]);
                         exit(0);
                     }
-                    fd2 = opne("/tmp/youdonotknowfile",
+                    fd2 = open("/tmp/youdonotknowfile",
                             O_WRONLY|O_CREAT|O_TRUNC, 0644);
                     dup2(fd2, 1);
                     execvp(arg[0], arg);
