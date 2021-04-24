@@ -7,18 +7,25 @@
 #include<fcntl.h>
 #include<sys/stat.h>
 #include<dirent.h>
+#include<signal.h>
+#include<readline/readline.h>
+#include<readline/history.h>
 
 
 #define normal 0        //一般的命令
 #define out_redirect 1  //输出重定向
 #define in_redirect 2   //输入重定向
 #define have_pipe 3     //命令中有管道
+#define outtwo_redirect 4 //>>
 
-void print_prompt();
-void get_input(char *);
-void explain_input(char *, int *, char a[][256]);
-void do_cmd(int, char a[][256]);
-int find_command(char *);
+void print_prompt();    //打印提示符
+void get_input(char *); //获取输入命令
+void explain_input(char *, int *, char a[][256]);   //解析输入的命令
+void do_cmd(int, char a[][256]);    //执行命令
+int find_command(char *);           //查找命令中的可执行程序
+
+char pwdname[256];
+char past[256];
 
 int main(int argc, char **argv)
 {
@@ -27,6 +34,8 @@ int main(int argc, char **argv)
     char arglist[100][256];
     char **arg = NULL;
     char *buf = NULL;
+
+    signal(SIGINT,SIG_IGN);     //屏蔽ctrl+c信号
 
     buf = (char *)malloc(256);
     if(buf == NULL)
@@ -40,13 +49,27 @@ int main(int argc, char **argv)
         //将buf所指向的空间清零
         memset(buf, 0, 256);
         print_prompt();
-        get_input(buf);
+        char *str = readline("\033[37mSSX)\033[0m$ ");  //使用readline读入命令
+        add_history(str);
+        strcpy(buf, str);
+        //get_input(buf);
+
+        if(str!=NULL)
+        {
+            free(str);
+            str = NULL;
+        }
 
         //若输入的命令为exit或logout则退出本程序
-        if(strcmp(buf, "exit\n") == 0 || strcmp(buf, "logout\n") == 0)
+        if(strcmp(buf, "exit") == 0 || strcmp(buf, "logout") == 0)  //这里去掉'\n'，因为readline无法读入'\n'
         {
             break;
         }
+        if(strcmp(buf, "\0") == 0)
+        {
+            continue;
+        }
+
         for(i=0; i<100; i++)
         {
             arglist[i][0] = '\0';
@@ -67,11 +90,12 @@ int main(int argc, char **argv)
 
 void print_prompt()
 {
-    printf("myshell$$ ");
+    getcwd(pwdname, 256);
+    printf("\033[34m%s(from \033[0m",pwdname);
 }
 
 //获取用户输入
-void get_input(char *buf)
+/*void get_input(char *buf)
 {
     int len = 0;
     int ch;
@@ -93,10 +117,10 @@ void get_input(char *buf)
     buf[len] = '\n';
     len++;
     buf[len] = '\0';
-}
+}*/
 
 //解析buf中的命令，将结果存入arglist中，命令以回车符号\n结束
-//如输入命令为"la -l /tmp",则arglist[0]、arglist[1]、arglist[2]分别为ls、-l和/tmp
+//如输入命令为"ls -l /tmp",则arglist[0]、arglist[1]、arglist[2]分别为ls、-l和/tmp
 void explain_input(char *buf, int *argcount, char arglist[100][256])
 {
     char *p = buf;
@@ -138,6 +162,8 @@ void do_cmd(int argcount, char arglist[100][256])
     int status;
     int i;
     int fd;
+
+    //指针数组，每个元素指向二维数组中的一行
     char * arg[argcount + 1];
     char * argnext[argcount + 1];
     char * file;
@@ -202,6 +228,15 @@ void do_cmd(int argcount, char arglist[100][256])
                 flag++;
             }
         }
+        if(strcmp(arg[i], ">>") == 0)
+        {
+            flag++;
+            how = outtwo_redirect;
+            if(arg[i+1] == NULL)
+            {
+                flag++;
+            }
+        }
     }
 
     /* flag大于1，说明命令中含有多个>,<,|符号，
@@ -211,6 +246,72 @@ void do_cmd(int argcount, char arglist[100][256])
     {
         printf("wrong command\n");
         return;
+    }
+
+    if(strcmp(arg[0], "ls") == 0)
+    {
+        //在最后加上ls参数 "--color"
+        strcpy(arglist[argcount], "--color");
+        arg[argcount] = (char *)arglist[argcount];
+
+        argcount = argcount + 1;
+        arg[argcount] = NULL;
+    }
+    else
+    {
+        arg[argcount] = NULL;
+    }
+
+    if(strncmp(arg[0], "cd", 2) == 0)
+    {
+        if(argcount == 1)
+        {
+            strcpy(past, pwdname);
+            chdir("/home/crushbb/");
+            return;
+        }
+        if(strncmp(arg[1], "~", 1) == 0 || argcount == 1)
+        {
+            strcpy(past, pwdname);
+            chdir("/home/crushbb/");
+            return;
+        }
+        else if(strncmp(arg[1], "-", 1) == 0)
+        {
+            if(past[0] == '\0' && past[1] == '\0')
+            {
+                printf("ERROR: wrong command about cd\n");
+                return;
+            }
+            else
+            {
+                if(chdir(past) == -1)
+                {
+                    printf("bash: cd: %s: No such file or directory\n", arg[1]);
+                }
+            }
+        }
+        else if(argcount == 2)
+        {
+            strcpy(past, pwdname);
+            if(chdir(arg[1]) == -1)
+            {
+                printf("bash: cd: %s: No such file or directory\n", arg[1]);
+            }
+        }
+        return;
+    }
+
+    if(how == outtwo_redirect)
+    {
+        for(i=0; arg[i]!=NULL; i++)
+        {
+            if(strcmp(arg[i], ">>") == 0)
+            {
+                file = arg[i+1];
+                arg[i] = NULL;
+            }
+        }
     }
 
     if(how == out_redirect)
