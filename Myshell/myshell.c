@@ -49,7 +49,7 @@ int main(int argc, char **argv)
         //将buf所指向的空间清零
         memset(buf, 0, 256);
         print_prompt();
-        char *str = readline("\033[37mSSX)\033[0m$ ");  //使用readline读入命令
+        char *str = readline("\033[37m\033[0m$ ");  //使用readline读入命令
         add_history(str);
         strcpy(buf, str);
         //get_input(buf);
@@ -91,7 +91,8 @@ int main(int argc, char **argv)
 void print_prompt()
 {
     getcwd(pwdname, 256);
-    printf("\033[34m%s(from \033[0m",pwdname);
+    //printf("%s", pwdname);
+    printf("\033[34m%s \033[0m",pwdname);
 }
 
 //获取用户输入
