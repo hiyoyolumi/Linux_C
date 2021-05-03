@@ -60,7 +60,7 @@ int main()
             break;
     }
 
-    //接触对SIGINT的屏蔽
+    //解除对SIGINT的屏蔽
     if(sigprocmask(SIG_SETMASK, &oldmask, NULL) < 0)
     {
         my_err("sigprocmask", __LINE__);
