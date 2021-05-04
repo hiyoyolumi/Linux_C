@@ -38,7 +38,7 @@ int main()
 
     sleep(10);
 
-    //获取未读信号序列
+    //获取未决信号序列
     if(sigpending(&pendmask) < 0)
     {
         my_err("sigpending", __LINE__);
