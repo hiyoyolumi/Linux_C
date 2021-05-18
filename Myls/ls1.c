@@ -18,7 +18,8 @@ int main(int argc, char * argv[])
             do_ls(*argv);
         }
     }
-    
+	
+	return 0;
 }
 
 void do_ls(char dirname[])
