@@ -1,18 +1,18 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<pthread.h>
-#include<semaphore.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <semaphore.h>
 
 #define N 5
 
-sem_t chopsticks[N];        //筷子的编号
+sem_t chopsticks[N]; //筷子的编号
 
-pthread_mutex_t mutex;      //定义互斥锁
+pthread_mutex_t mutex; //定义互斥锁
 
-int philosophers[N] = {0, 1, 2, 3, 4};  //哲学家的编号
+int philosophers[N] = {0, 1, 2, 3, 4}; //哲学家的编号
 
 void *philosopher(void *arg);
-void delay (int len);
+void delay(int len);
 
 int main()
 {
@@ -20,7 +20,7 @@ int main()
     srand(time(NULL));
 
     //初始化信号量
-    for(int i=0; i<N; i++)
+    for (int i = 0; i < N; i++)
     {
         sem_init(&chopsticks[i], 0, 1);
     }
@@ -29,25 +29,25 @@ int main()
     pthread_mutex_init(&mutex, NULL);
 
     //创建线程
-    for(int i=0; i<N; i++)
+    for (int i = 0; i < N; i++)
     {
         pthread_create(&philo[i], NULL, (void *)philosopher, &philosophers[i]);
     }
 
     //挂起线程
-    for(int i=0; i<N; i++)
+    for (int i = 0; i < N; i++)
     {
         pthread_join(philo[i], NULL);
     }
 
     //销毁信号量
-    for(int i=0; i<N; i++)
+    for (int i = 0; i < N; i++)
     {
         sem_destroy(&chopsticks[i]);
     }
 
     //销毁互斥锁
-    for(int i=0; i<N; i++)
+    for (int i = 0; i < N; i++)
     {
         pthread_mutex_destroy(&mutex);
     }
@@ -58,9 +58,9 @@ int main()
 void *philosopher(void *arg)
 {
     int i = *(int *)arg;
-    int left = i;       //左筷子的编号和哲学家的编号相同
-    int right = (i+1)%N;
-    while(1)
+    int left = i; //左筷子的编号和哲学家的编号相同
+    int right = (i + 1) % N;
+    while (1)
     {
         printf("Philosophy %d is thinking.\n", i);
         delay(60000);
@@ -70,7 +70,7 @@ void *philosopher(void *arg)
         //加锁
         pthread_mutex_lock(&mutex);
 
-        sem_wait(&chopsticks[left]);   //当这个哲学家的左筷子存在时，可以继续,否则等待
+        sem_wait(&chopsticks[left]); //当这个哲学家的左筷子存在时，可以继续,否则等待
         printf("Now philosophy %d had chopstick %d, He have only one, Can Not Eat!\n", i, left);
         sem_wait(&chopsticks[right]);
         printf("philosophy %d had chopstick %d, He have a pair of chopsticks, He Can Eat!\n", i, right);
@@ -86,17 +86,17 @@ void *philosopher(void *arg)
     }
 }
 
-void delay (int len) 
+void delay(int len)
 {
-	int i = rand() % len;
-	int x;
-	while (i > 0) 
-	{
-		x = rand() % len;
-		while (x > 0) 
-		{
-			x--;
-		}
-		i--;
-	}
+    int i = rand() % len;
+    int x;
+    while (i > 0)
+    {
+        x = rand() % len;
+        while (x > 0)
+        {
+            x--;
+        }
+        i--;
+    }
 }
