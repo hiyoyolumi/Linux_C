@@ -150,18 +150,19 @@ int threadpool_add_job(struct threadpool *pool, void* (*callback_function)(void 
     assert(callback_function != NULL);
     assert(arg != NULL);
 
-    pthread_mutex_lock(&(pool->mutex));
+    pthread_mutex_lock(&(pool->mutex)); //加锁
     while((pool->queue_cur_num == pool->queue_max_num) && !(pool->queue_close || pool->pool_close))
-    {
+    {                                                       //队列与线程池都未关闭
         pthread_cond_wait(&(pool->queue_not_full), &(pool->mutex)); //队列满时就等待
     }
-    if(pool->queue_close || pool->pool_close)
+    if(pool->queue_close || pool->pool_close)   //如果队列或线程池关闭，开锁，返回
     {
         pthread_mutex_unlock(&(pool->mutex));
         return -1;
     }
+
     struct job *pjob = (struct job *)malloc(sizeof(struct job));
-    if(pjob == NULL)
+    if(pjob == NULL)    //内存分配失败，开锁，返回
     {
         pthread_mutex_unlock(&(pool->mutex));
         return -1;
@@ -181,6 +182,7 @@ int threadpool_add_job(struct threadpool *pool, void* (*callback_function)(void 
         pool->tail = pjob;
     }
     pool->queue_cur_num++;
+    
     pthread_mutex_unlock(&(pool->mutex));
 
     return 0;
