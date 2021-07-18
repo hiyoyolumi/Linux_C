@@ -106,6 +106,7 @@ int main()
         pid = fork();
         if(pid == 0)
         {
+            close(sock_fd);     //关闭用于与建立连接的套接字
             while(1)
             {
                 ret = recv(conn_fd, recv_buf, BUFSIZE, 0);
@@ -152,7 +153,7 @@ int main()
         }
         else    //父进程
         {
-            close(conn_fd);
+            close(conn_fd); //关闭用于与客户端通信的套接字
         }
     }
 
