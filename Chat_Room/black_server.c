@@ -32,7 +32,7 @@ int main()
     }
 
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htonl(SERV_PORT);
+    serv_addr.sin_port = htons(SERV_PORT);  //htons but not htonl, otherwise client will connect error
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     memset(serv_addr.sin_zero, 0, sizeof(serv_addr.sin_zero));
     if (bind(serv_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1)
@@ -60,6 +60,7 @@ int main()
             my_err("recv error", __LINE__);
         }
         write(STDOUT_FILENO, buf, ret);
+        printf("\n");
 
         for (i = 0; i < ret; i++)
         {
