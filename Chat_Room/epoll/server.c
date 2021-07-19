@@ -81,18 +81,8 @@ int main()
                 {
                     if(write(STDOUT_FILENO, buf, n) == -1)
                         my_err("write orror", __LINE__);
-                    printf("\n");
-
-                    /*
-                    //小-->大
-                    for(j=0; j<n; j++)
-                        buf[j] = toupper(buf[j]);
-                    */
-
-
-                    /*if(write(ep[i].data.fd, buf, n) == -1)
-                        my_err("write error", __LINE__);\
-                    */
+                    
+                    
                     if(client[0] == ep[i].data.fd)
                     {
                         if(write(client[1], buf, n) == -1)

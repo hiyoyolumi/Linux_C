@@ -13,6 +13,15 @@
 #define INVALID_USERINFO 'n'
 #define VALID_USERINFO 'y'
 
+struct node
+{
+    char account[20];       //账号
+    char password[20];      //密码
+    char name[20];          //昵称
+    char security[20];      //密保
+    int serial;             //服务器标识序号(从0开始)，可用于client的下标
+};
+
 //欢迎界面信息
 void welcome();
 //用户界面信息
