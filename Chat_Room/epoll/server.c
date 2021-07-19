@@ -1,14 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <errno.h>
-#include <ctype.h>
-#include <sys/epoll.h>
 #include "func.h"
 
 #define SERV_PORT 4507
@@ -76,6 +65,8 @@ int main()
 
                 //
                 client[j++] = cfd;
+
+                Write(cfd, "Welcome to my_server!\n");
             }
             else                        //cfd们满足读事件，有客户端数据写来
             {
@@ -128,18 +119,4 @@ int main()
     }
 
     return 0;
-}
-
-void welcome()
-{
-    printf("[1] 登陆\n");
-    printf("[2] 注册\n");
-    printf("[3] 找回密码\n");
-    printf("[4] 好友列表");
-    printf("[5] 添加好友");
-    printf("[6] 群列表");
-    printf("[7] 群选项");
-    printf("[8] 发送文件");
-
-    return NULL;
 }
