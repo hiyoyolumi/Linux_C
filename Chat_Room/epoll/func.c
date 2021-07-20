@@ -5,8 +5,6 @@ void welcome()
     printf("[1] 登陆\n");
     printf("[2] 注册\n");
     printf("[3] 找回密码\n");
-
-    return NULL;
 }
 
 void welcome_1()
@@ -17,15 +15,12 @@ void welcome_1()
     printf("[4] 群选项");
     printf("[5] 发送文件");
     printf("[6] 退出登陆");
-
-    return NULL;
 }
 
 void welcome_friends()
 {
     
 
-    return NULL;
 }
 
 void Write(int fd, const char *buf)
@@ -35,6 +30,11 @@ void Write(int fd, const char *buf)
         my_err("write error", __LINE__);
     }
 }
+
+
+
+
+
 
 int get_userinfo(char *buf, int len)
 {
@@ -79,6 +79,20 @@ void judge_userinfo(int fd, const char *string)
         }
 
     } while (flag_userinfo == INVALID_USERINFO);
+
+}
+
+void my_err(const char *str, const int line)
+{
+    fprintf(stderr, "%d : %s : %s", line, str, strerror(errno));
+    exit(1);
+}
+
+
+
+
+//处理注册请求
+void *func_zhuce(void *arg)
+{
     
-    return NULL;
 }
