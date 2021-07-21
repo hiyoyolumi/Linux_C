@@ -25,6 +25,13 @@ struct node
     int serial;             //服务器标识序号(从0开始)，可用于client的下标
 };
 
+struct cfd_mysql
+{
+    int cfd;
+    MYSQL mysql;
+    struct sockaddr_in clit_addr;
+};
+
 //
 //打印类函数
 //
@@ -75,7 +82,7 @@ void my_err(const char *str, const int line);
 //
 //向表中add数据
 //str为insert语句
-void mysql_add(MYSQL *mysql, const char *str, const struct sockaddr_in clit_addr);
+void mysql_add(MYSQL *mysql, const char *str, const struct sockaddr_in clit_addr, const char *table);
 
 //建表
 //str为建表语句

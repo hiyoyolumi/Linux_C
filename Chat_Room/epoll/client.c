@@ -2,7 +2,7 @@
 
 #define SERV_PORT 4507
 
-
+int num_birth;
 
 void *my_write(void *arg)
 {
@@ -65,6 +65,8 @@ int main()
     write(STDOUT_FILENO, buf, strlen(buf));
 
     //welcome_interface(cfd);
+    //打印欢迎界面信息
+    welcome();
 
     
 

@@ -1,29 +1,35 @@
 #include "func.h"
 
 
-void mysql_build(MYSQL *mysql, const char *str)
-{
-    int rc;
+// void mysql_build(MYSQL *mysql, const char *str)
+// {
+//     int rc;
 
-    rc = mysql_real_query(&mysql, str, strlen(str));
-    if(rc != 0)
-        my_err("mysql_real_query error", __LINE__);
-}
+//     rc = mysql_real_query(mysql, str, strlen(str));
+//     if(rc != 0)
+//         my_err("mysql_real_query error", __LINE__);
+// }
 
-void mysql_add(MYSQL *mysql, const char *str, const struct sockaddr_in clit_addr)
+void mysql_add(MYSQL *mysql, const char *str, const struct sockaddr_in clit_addr, const char *table)
 {
     int i;
     int rc;
     int rows, fields;
     MYSQL_RES *res;
     MYSQL_ROW row;
+    char str_select[20];
 
+    sprintf(str_select, "select * from %s", table);
 
-    rc = mysql_real_query(&mysql, str, strlen(str));
+    rc = mysql_real_query(mysql, str, strlen(str));
     if(rc != 0)
         my_err("mysql_real_query error", __LINE__);
     
-    res = mysql_store_result(&mysql);
+
+    rc = mysql_real_query(mysql, str_select, strlen(str_select));
+    if(rc != 0)
+        my_err("mysql_real_query error", __LINE__);
+    res = mysql_store_result(mysql);
     if(res == NULL)
         my_err("mysql_store_result error", __LINE__);
 
@@ -42,13 +48,13 @@ void mysql_add(MYSQL *mysql, const char *str, const struct sockaddr_in clit_addr
 
 int mysql_repeat(MYSQL *mysql, const char *string, const char *str, int field)
 {
-    int buf[100];
+    char buf[100];
     int fields;
     MYSQL_RES *res;
     MYSQL_ROW row;
     sprintf(buf, "select * from %s", string);
-    mysql_real_query(&mysql, buf, strlen(buf));
-    res = mysql_store_result(&mysql);
+    mysql_real_query(mysql, buf, strlen(buf));
+    res = mysql_store_result(mysql);
     fields = mysql_num_fields(res);
     if(field > fields)
     {
