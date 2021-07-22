@@ -11,6 +11,7 @@
 #include <sys/epoll.h>
 #include <mysql/mysql.h>
 #include <pthread.h>
+#include "time.h"
 
 #define INVALID_USERINFO 'n'
 #define VALID_USERINFO 'y'
@@ -18,11 +19,11 @@
 
 struct node
 {
-    char account[20];       //账号
-    char password[20];      //密码
-    char name[20];          //昵称
-    char security[20];      //密保
-    int serial;             //服务器标识序号(从0开始)，可用于client的下标
+    char username[20];
+    char password[20];
+    char nickname[20];
+    char mibao[20];
+    int num;
 };
 
 struct cfd_mysql
@@ -30,6 +31,15 @@ struct cfd_mysql
     int cfd;
     MYSQL mysql;
     struct sockaddr_in clit_addr;
+    char username[20];
+    char tousername[20];
+    int retval;
+};
+
+struct name_fd_sql
+{
+    char username[20];
+    struct cfd_mysql cm;
 };
 
 //
@@ -41,7 +51,8 @@ void welcome();
 void welcome_1();
 //好友界面信息-->好友列表
 void welcome_friends();
-
+//获取系统当前时间
+char *get_time();
 
 //
 //引导类函数
@@ -97,4 +108,10 @@ int mysql_repeat(MYSQL *mysql, const char *string, const char *str, int field);
 
 
 //server多线程函数
+int huitui(const char *buf);
+int huitui_val(const char *buf);
 void *func_zhuce(void *arg);
+void *func_denglu(void *arg);
+void *func_zhaohui(void *arg);
+void *func_yonghu(void *arg);
+void *func_liaotian(void *arg);

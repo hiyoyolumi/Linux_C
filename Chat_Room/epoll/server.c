@@ -62,11 +62,13 @@ int main()
     rows = mysql_num_rows(res);
     fields = mysql_num_fields(res);
     //每次启动服务器时，检索UserData中num的最大值并赋值给num_birth
+    //并把每个用户的status置为0（非在线状态）
     while(row = mysql_fetch_row(res))
     {
         for(i=0; i<fields; i++)
         {
             num_birth = atoi(row[fields - 1]);
+            
         }
     }
     num_birth += 1;
@@ -107,6 +109,7 @@ int main()
 
     //int client[2];      //存两个客户端的fd
     struct cfd_mysql cm;
+    void *retval;
 
     while(1)
     {   
@@ -145,27 +148,73 @@ int main()
                 {
                     if(write(STDOUT_FILENO, buf, n) == -1)
                         my_err("write orror", __LINE__);
-
+                    cm.cfd = ep[i].data.fd;
+                    cm.mysql = mysql;
+                    cm.clit_addr = clit_addr;
                     //接受客户端发来的请求，并调用相关函数
                     //strcpy(request, buf);
                     //request[strlen(request)-1] = '\0';
                     if(strncmp(buf, "2\n", 2) == 0)
                     {
-                        cm.cfd = ep[i].data.fd;
-                        cm.mysql = mysql;
-                        cm.clit_addr = clit_addr;
+                        // cm.cfd = ep[i].data.fd;
+                        // cm.mysql = mysql;
+                        // cm.clit_addr = clit_addr;
                         strcpy(buf, "---开始注册\n");
                         Write(ep[i].data.fd, buf);
                         if(pthread_create(&thid[z++], NULL, func_zhuce, (void *)&cm) == -1)
                             my_err("pthread_create error\n", __LINE__);
-                        pthread_join(thid[z - 1], NULL);
-                        Write(ep[i].data.fd, "---注册成功\n");
+                        pthread_join(thid[z - 1], &retval);
+                        if((long)retval == 1)
+                        {
+                            Write(ep[i].data.fd, "---注册成功\n");
+                            Write(cm.cfd, "[1] 登陆\n[2] 注册\n[3] 找回密码\n");
+                        }
+                        else
+                        {
+                            Write(ep[i].data.fd, "---注册取消\n");
+                            Write(cm.cfd, "[1] 登陆\n[2] 注册\n[3] 找回密码\n");
+                        }
 
-                        Write(cm.cfd, "[1] 登陆\n[2] 注册\n[3] 找回密码\n");
+                        //Write(cm.cfd, "[1] 登陆\n[2] 注册\n[3] 找回密码\n");
                     }
                     else if(strncmp(buf, "1\n", 2) == 0)
                     {
-                        
+                        struct cfd_mysql *user;
+
+                        Write(ep[i].data.fd, "---开始登陆\n");
+                        if(pthread_create(&thid[z++], NULL, func_denglu, (void *)&cm) == -1)
+                            my_err("pthread_create error", __LINE__);
+                        pthread_join(thid[z - 1], &retval);
+                        user = (struct cfd_mysql *)retval;
+                        if(user->retval == 1)
+                        {
+                            Write(cm.cfd, "---登陆成功\n");
+                            //进入用户界面
+                            if(pthread_create(&thid[z++], NULL, func_yonghu, (void *)user) == -1)
+                                my_err("pthread_create error", __LINE__);
+                            
+
+                        }
+                        else
+                        {
+                            Write(cm.cfd, "[1] 登陆\n[2] 注册\n[3] 找回密码\n");
+                        }
+                    }
+                    else if(strncmp(buf, "3\n", 2) == 0)
+                    {
+                        Write(ep[i].data.fd, "---开始找回密码\n");
+                        if(pthread_create(&thid[z++], NULL, func_zhaohui, (void *)&cm) == -1)
+                            my_err("pthread_create error", __LINE__);
+                        pthread_join(thid[z - 1], &retval);
+                        if((long)retval == 1)
+                        {
+                            Write(cm.cfd, "---密码找回成功\n");
+                            Write(cm.cfd, "[1] 登陆\n[2] 注册\n[3] 找回密码\n");
+                        }
+                        else
+                        {
+                            Write(cm.cfd, "[1] 登陆\n[2] 注册\n[3] 找回密码\n");
+                        }
                     }
                     else
                     {
