@@ -3,6 +3,14 @@
 #define SERV_PORT 4507
 
 int num_birth;
+int clients[1000];
+pthread_mutex_t mutex;
+
+int lfd;
+int epfd;
+struct epoll_event tep, ep[MAXEVE];
+
+int level;
 
 void *my_write(void *arg)
 {

@@ -37,6 +37,12 @@ int main(int argc, const char *argv[])
     {
         printf("sizeof = %d\n", sizeof(row[4]));
     }
+    rows = mysql_real_query(&mysql, query_str, strlen(query_str));
+    res = mysql_store_result(&mysql);
+    while(row = mysql_fetch_row(res))
+    {
+        printf("sizeof = %d\n", sizeof(row[4]));
+    }
     //printf("count = %d\n", count);
 
 

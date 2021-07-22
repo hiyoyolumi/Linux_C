@@ -1,13 +1,22 @@
 #include "func.h"
 
 #define SERV_PORT 4507
-#define MAXEVE 1024
+//#define MAXEVE 1024
+
+pthread_mutex_t mutex;
 
 int num_birth;
+int clients[1000];
+
+int lfd;
+int epfd;
+struct epoll_event tep, ep[MAXEVE];
+
+int level;
 
 int main()
 {
-    int lfd, cfd;
+    int cfd;
     struct sockaddr_in serv_addr, clit_addr;
     int clit_addr_len;
     int ret;
@@ -26,6 +35,8 @@ int main()
     pthread_t thid[1000];
     int z = 0;
     // int flag = 0;   //线程id的下标
+
+    pthread_mutex_init(&mutex, NULL);
 
     //初始化数据库
     if (NULL == mysql_init(&mysql)) {
@@ -67,12 +78,11 @@ int main()
     {
         for(i=0; i<fields; i++)
         {
-            num_birth = atoi(row[fields - 1]);
-            
+            num_birth = atoi(row[4]);
         }
     }
     num_birth += 1;
-
+    printf("%d\n", __LINE__);
 
     //初始化服务器
     lfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -97,8 +107,8 @@ int main()
     if(cfd == -1)
         my_err("accept error", __LINE__);*/
 
-    int epfd = epoll_create(MAXEVE);
-    struct epoll_event tep, ep[MAXEVE]; //tep用来设置单个属性，ep是epoll_wait()传出满足事件的数组
+    epfd = epoll_create(MAXEVE);
+    //struct epoll_event tep, ep[MAXEVE]; //tep用来设置单个属性，ep是epoll_wait()传出满足事件的数组
     tep.data.fd = lfd;
     tep.events = EPOLLIN;
 
@@ -192,7 +202,7 @@ int main()
                             //进入用户界面
                             if(pthread_create(&thid[z++], NULL, func_yonghu, (void *)user) == -1)
                                 my_err("pthread_create error", __LINE__);
-                            
+                            //continue;
 
                         }
                         else
@@ -218,7 +228,7 @@ int main()
                     }
                     else
                     {
-
+                        continue;
                     }
 
 

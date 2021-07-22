@@ -1,6 +1,14 @@
 #include "func.h"
 
 extern int num_birth;
+extern int clients[1000];
+extern pthread_mutex_t mutex;
+
+extern int lfd;
+extern int epfd;
+extern struct epoll_event tep, ep[MAXEVE];
+
+extern int level;
 
 char *get_time(char *now_time)
 {
@@ -17,9 +25,9 @@ char *get_time(char *now_time)
 
 void welcome()
 {
-    printf("[1] 登陆\n");
-    printf("[2] 注册\n");
-    printf("[3] 找回密码\n");
+    printf("[a] 登陆\n");
+    printf("[b] 注册\n");
+    printf("[c] 找回密码\n");
 }
 
 void welcome_1()
@@ -135,10 +143,12 @@ void *func_denglu(void *arg)
 
     while(1)
     {
+        retval->retval = 1;
         Write(cm.cfd, "---请输入账号(q to quit):");
         n = read(cm.cfd, buf, sizeof(buf));
         retval->retval = huitui_val(buf);
-        pthread_exit((void *)retval);
+        if(retval->retval == 0)
+            pthread_exit((void *)retval);
         buf[n - 1] = '\0';
         ret = mysql_repeat(&cm.mysql, "UserData", buf, 1);
         if(ret == 0)
@@ -174,17 +184,33 @@ void *func_denglu(void *arg)
             rows = mysql_real_query(&retval->mysql, temp, strlen(temp));
             if(rows != 0)
                 my_err("mysql_real_query error", __LINE__);
-            res = mysql_store_result(&retval->mysql);
-            if(res == NULL)
-                my_err("mysql_store_result error", __LINE__);
-            while(row = mysql_fetch_row(res))
-            {
-                //将该用户 设置为登陆状态
-                if(strcmp(retval->username, row[0]) == 0)
-                {
-                    row[5] = 1;
-                }
-            }
+            
+            //登陆后将客户端的套接字在UserData表中更新
+            // pthread_mutex_lock(&mutex);
+            sprintf(temp, "update UserData set cfd = %d where username = \"%s\"", retval->cfd, retval->username);
+            pthread_mutex_lock(&mutex);
+            rows = mysql_real_query(&retval->mysql, temp, strlen(temp));
+            if(rows != 0)
+                my_err("mysql_real_query error", __LINE__);
+            pthread_mutex_unlock(&mutex);
+
+            // sprintf(temp, "update UserData set status = 1 where username = \"%s\"", retval->username);
+            // pthread_mutex_lock(&mutex);
+            // rows = mysql_real_query(&retval->mysql, temp, strlen(temp));
+            // if(rows != 0)
+            //     my_err("mysql_real_query error", __LINE__);
+            // pthread_mutex_unlock(&mutex);
+            // res = mysql_store_result(&retval->mysql);
+            // if(res == NULL)
+            //     my_err("mysql_store_result error", __LINE__);
+            // while(row = mysql_fetch_row(res))
+            // {
+            //     //将该用户 设置为登陆状态
+            //     if(strcmp(retval->username, row[0]) == 0)
+            //     {
+            //         sprintf(temp, "update UserData set status = %d where username = \"%s\"", 1, retval->username);
+            //     }
+            // }
             sleep(1);
             //Write(cm.cfd, "---登陆成功\n");
             break;
@@ -268,15 +294,18 @@ void *func_zhuce(void *arg)
             buf[strlen(buf)-1] = '\0';
             strcpy(data.mibao, buf);
 
+            pthread_mutex_lock(&mutex);
             data.num = num_birth++;
 
             //向UserData中add数据
             sprintf(query_str, "\
-insert into UserData values(\"%s\", \"%s\", \"%s\", \"%s\", \"%d\", \"%d\")", \
-data.username, data.password, data.nickname, data.mibao, data.num, 0);
-            printf("[%s] %s", get_time(now_time), query_str);
-            mysql_add(&cm.mysql, query_str, cm.clit_addr, "UserData");
+insert into UserData values(\"%s\", \"%s\", \"%s\", \"%s\", \"%d\", \"%d\", \"%d\", \"0\")", \
+data.username, data.password, data.nickname, data.mibao, data.num, 0, cm.cfd);
+            pthread_mutex_unlock(&mutex);
 
+            //printf("[%s] %s", get_time(now_time), query_str);
+            mysql_add(&cm.mysql, query_str, cm.clit_addr, "UserData");
+            printf("[%s] %s", get_time(now_time), query_str);
             break;
         }
     }
@@ -293,6 +322,9 @@ void *func_zhaohui(void *arg)
     char username[20];
     char query_str[100];
     char now_time[100];
+    int rows;
+    MYSQL_RES *res;
+    MYSQL_ROW row;
 
     while(1)
     {
@@ -341,6 +373,9 @@ void *func_zhaohui(void *arg)
                     printf("[%s] ip %s username change password\n", get_time(now_time), inet_ntoa(cm.clit_addr.sin_addr));
                     printf("new password:%s\n", new);
                     sprintf(query_str, "update UserData set password = %s where username = \"%s\"", new, username);
+                    rows = mysql_real_query(&cm.mysql, query_str, strlen(query_str));
+                    if(rows != 0)
+                        my_err("mysql_real_query error", __LINE__);
                     Write(cm.cfd, "---修改密码成功\n");
                     break;
                 }
@@ -369,6 +404,7 @@ int huitui_val(const char *buf)
         printf("cancel\n");
         return 0;
     }
+    return 1;
 }
 
 int huitui(const char *buf)
@@ -381,11 +417,13 @@ int huitui(const char *buf)
 }
 
 
-//分离状态的线程
+//分离状态的线程---用户界面
 void *func_yonghu(void *arg)
 {
     pthread_detach(pthread_self());
 
+    int newsnum;
+    char now_time[100];
     struct cfd_mysql cm;
     cm = *(struct cfd_mysql*)arg;
     char buf[BUFSIZ];
@@ -393,8 +431,8 @@ void *func_yonghu(void *arg)
     char *query_str;
     char buff[BUFSIZ];
     int rows;
-    MYSQL_RES *res;
-    MYSQL_ROW row;
+    MYSQL_RES *res, *res2;
+    MYSQL_ROW row, row2;
 
     //检索数据库中是否已为此用户建表
     //如果没表就以username新建一个表
@@ -409,47 +447,341 @@ void *func_yonghu(void *arg)
     int count = 0;
     while(row = mysql_fetch_row(res))
     {
-        count++;
         if(strcmp(cm.username, row[0]) == 0)
         {
-            count--;
+            count = 1;
             break;
         }
     }
-    if(count == rows)
-        sprintf(temp, "create table %s(username varchar(20), num double, groupname varchar(20), groupnum double)", cm.username);
+    printf("count = %d\n", count);
+    if(count == 0)
+    {
+        sprintf(temp, \
+        "create table %s(friend varchar(20), type double)", \
+                cm.username);
+        rows = mysql_real_query(&cm.mysql, temp, strlen(temp));
+        if(rows != 0)
+            my_err("mysql_real_query error", __LINE__);
+    }
+    
 
-
-    sprintf(temp, "------%s------", cm.username);
+    int sta;
+    int ret;
+    pthread_t thid;
+    query_str = "select * from UserData";
+    sprintf(temp, "------%s------\n", cm.username);
     while(1)
     {
+        int i = 0;
+        int j;
         Write(cm.cfd, temp);
+        rows = mysql_real_query(&cm.mysql, query_str, strlen(query_str));
+        if(rows != 0)
+            my_err("mysql_real_query error", __LINE__);
+        res = mysql_store_result(&cm.mysql);
+        if(res == NULL)
+            my_err("mysql_store_result error", __LINE__);
+        while(row = mysql_fetch_row(res))
+        {
+            if(strcmp(cm.username, row[0]) == 0)
+            {
+                sprintf(buff, "------news(%d)------(v to view)\n", atoi(row[7]));
+                newsnum = atoi(row[7]);
+                Write(cm.cfd, buff);
+                break;
+            }
+        }
         Write(cm.cfd, "[1] 好友列表\n[2] 添加好友\n[3] 群列表\n[4] 群选项\n[5] 退出登陆\n");
         read(cm.cfd, buf, sizeof(buf));
-        if(strncmp(buf, "1\n", 2) == 0)
+        if(strncmp(buf, "v\n", 2) == 0)
         {
-            sprintf(buff, "select * from %s", cm.username);
-            rows = mysql_real_query(&cm.mysql, buff, strlen(buff));
-            if(rows != 0)
-                my_err("mysql_real_query error", __LINE__);
-            res = mysql_store_result(&cm.mysql);
-            if(res == NULL)
-                my_err("mysql_store_result error", __LINE__);
-            while(row = mysql_fetch_row(res))
+            while(1)
             {
-                if(atoi(row[5]) == 1)
-                    printf("------%s---在线\n", row[0]);
-                else
-                    printf("------%s---离线\n", row[0]);
+                Write(cm.cfd, "输入序号以处理消息(q to quit)\n");
+                //读取OffLineMes中发给自己的消息
+                query_str = "select * from OffLineMes";
+                rows = mysql_real_query(&cm.mysql, query_str, strlen(query_str));
+                if(rows != 0)
+                    my_err("mysql_real_query error", __LINE__);
+                res = mysql_store_result(&cm.mysql);
+                if(res == NULL)
+                    my_err("mysql_store_result error", __LINE__);
+                while(row = mysql_fetch_row(res))
+                {
+                    if(strcmp(cm.username, row[2]) == 0)
+                    {
+                        sprintf(buff, "[%d]-<%s>-(%s)---%s\n", i++, row[0], row[1], row[3]);
+                        Write(cm.cfd, buff);
+                    }
+                }
+                Read(cm.cfd, buf, sizeof(buf));
+                buf[strlen(buf) - 1] = '\0';
+                for(j=0; j<i; j++)
+                {
+                    if(atoi(buf) == j)
+                    {
+                        break;
+                    }
+                }
+                rows = mysql_real_query(&cm.mysql, query_str, strlen(query_str));
+                if(rows != 0)
+                    my_err("mysql_real_query error", __LINE__);
+                res = mysql_store_result(&cm.mysql);
+                if(res == NULL)
+                    my_err("mysql_store_result error", __LINE__);
+                i = 0;
+                while(row = mysql_fetch_row(res))
+                {
+                    if(strcmp(cm.username, row[2]) == 0)    //在OffLineMes中找到发给自己的消息
+                    {
+                        if(j == i++)    //从OffLineMes中找到自己要处理的消息
+                        {
+                            if(atoi(row[4]) == 1)   //加好友类型的消息
+                            {
+                                Read(cm.cfd, buf, sizeof(buf));
+                                if(strncmp(buf, "q\n", 2) == 0)
+                                    break;
+                                buf[strlen(buf) - 1] = '\0';
+                                if(strncmp(buf, "1", 1) == 0)   //同意加好友申请
+                                {
+                                    sprintf(buff, "insert into %s values(\"%s\", \"1\")", cm.username, row[1]);
+                                    pthread_mutex_lock(&mutex);
+                                        rows = mysql_real_query(&cm.mysql, buff, strlen(buff));
+                                        if(rows != 0)
+                                            my_err("mysql_real_query error", __LINE__);
+                                    pthread_mutex_unlock(&mutex);
+
+                                    sprintf(buff, "insert into %s values(\"%s\", \"1\")", row[1], row[2]);
+                                    pthread_mutex_lock(&mutex);
+                                        rows = mysql_real_query(&cm.mysql, buff, strlen(buff));
+                                        if(rows != 0)
+                                            my_err("mysql_real_query error", __LINE__);
+                                    pthread_mutex_unlock(&mutex);
+
+                                    sprintf(buff, "update UserData set newsnum = %d where username = \"%s\"", \
+                                                                            --newsnum,                row[2]);
+                                    pthread_mutex_lock(&mutex);
+                                        rows = mysql_real_query(&cm.mysql, buff, strlen(buff));
+                                        if(rows != 0)
+                                            my_err("mysql_real_create error", __LINE__);
+                                    pthread_mutex_unlock(&mutex);
+
+                                    sprintf(buff, "delete form OffLineMes where time = \"%s\"", \
+                                                                                        row[0]);
+                                    pthread_mutex_lock(&mutex);
+                                        rows = mysql_real_query(&cm.mysql, buff, strlen(buff));
+                                        if(rows != 0)
+                                            my_err("mysql_real_query error", __LINE__);
+                                    pthread_mutex_unlock(&mutex);
+                                }
+                                else if(strncmp(buf, "2", 1) == 0)  //拒绝加好友申请
+                                {
+                                    //strcpy(buff, "对方拒绝了你的好友申请");
+                                    sprintf(buff, "insert into OffLineMes values\
+                                    (\"%s\", \"%s\", \"%s\", \"对方拒绝了你的好友申请\", \"%d\")", \
+                                    get_time(now_time), row[2], row[1], 2);
+                                    pthread_mutex_lock(&mutex);
+                                        rows = mysql_real_query(&cm.mysql, buff, strlen(buff));
+                                        if(rows != 0)
+                                            my_err("mysql_real_query", __LINE__);
+                                    pthread_mutex_unlock(&mutex);
+
+                                    sprintf(buff, "update UserData set newsnum = %d where username = \"%s\"", \
+                                                                            --newsnum,                row[2]);
+                                    pthread_mutex_lock(&mutex);
+                                        rows = mysql_real_query(&cm.mysql, buff, strlen(buff));
+                                        if(rows != 0)
+                                            my_err("mysql_real_create error", __LINE__);
+                                    pthread_mutex_unlock(&mutex);
+
+                                    sprintf(buff, "delete form OffLineMes where time = \"%s\"", \
+                                                                                        row[0]);
+                                    pthread_mutex_lock(&mutex);
+                                        rows = mysql_real_query(&cm.mysql, buff, strlen(buff));
+                                        if(rows != 0)
+                                            my_err("mysql_real_query error", __LINE__);
+                                    pthread_mutex_unlock(&mutex);
+                                }
+                            }
+                            else if(atoi(row[4]) == 0)   //聊天型消息
+                            {
+                                
+
+
+                                sprintf(buff, "update UserData set newsnum = %d where username = \"%s\"", \
+                                                                            --newsnum,                row[2]);
+                                pthread_mutex_lock(&mutex);
+                                    rows = mysql_real_query(&cm.mysql, buff, strlen(buff));
+                                    if(rows != 0)
+                                        my_err("mysql_real_create error", __LINE__);
+                                pthread_mutex_unlock(&mutex);
+
+                                sprintf(buff, "delete form OffLineMes where time = \"%s\"", \
+                                                                                    row[0]);
+                                pthread_mutex_lock(&mutex);
+                                    rows = mysql_real_query(&cm.mysql, buff, strlen(buff));
+                                    if(rows != 0)
+                                        my_err("mysql_real_query error", __LINE__);
+                                pthread_mutex_unlock(&mutex);
+                            }
+                            else if(atoi(row[4]) == 2)   //只读型消息
+                            {
+                                sprintf(buff, "update UserData set newsnum = %d where username = \"%s\"", \
+                                                                            --newsnum,                row[2]);
+                                pthread_mutex_lock(&mutex);
+                                    rows = mysql_real_query(&cm.mysql, buff, strlen(buff));
+                                    if(rows != 0)
+                                        my_err("mysql_real_create error", __LINE__);
+                                pthread_mutex_unlock(&mutex);
+
+                                sprintf(buff, "delete form OffLineMes where time = \"%s\"", \
+                                                                                    row[0]);
+                                pthread_mutex_lock(&mutex);
+                                    rows = mysql_real_query(&cm.mysql, buff, strlen(buff));
+                                    if(rows != 0)
+                                        my_err("mysql_real_query error", __LINE__);
+                                pthread_mutex_unlock(&mutex);
+                            }
+                        }
+                    }
+                }
+                if(strncmp(buf, "q\n", 2) == 0)
+                    break;
             }
-            Write(cm.cfd, "---输入用户名，开始聊天\n");
-            read(cm.cfd, buf, sizeof(buf));
-            buf[strlen(buf) - 1] = '\0';
-            mysql_repeat(&cm.mysql, cm.username, buf, 1);
+        }
+        else if(strncmp(buf, "1\n", 2) == 0)
+        {
+            while(1)
+            {
+                sprintf(buff, "select * from %s", cm.username);
+                rows = mysql_real_query(&cm.mysql, buff, strlen(buff));
+                if(rows != 0)
+                    my_err("mysql_real_query error", __LINE__);
+                res = mysql_store_result(&cm.mysql);
+                if(res == NULL)
+                    my_err("mysql_store_result error", __LINE__);
+                while(row = mysql_fetch_row(res))
+                {
+                    rows = mysql_real_query(&cm.mysql, "select * from UserData", strlen("select * from UserData"));
+                    if(rows != 0)
+                        my_err("mysql_real_query error", __LINE__);
+                    res2 = mysql_store_result(&cm.mysql);
+                    if(res2 == NULL)
+                        my_err("mysql_real_query error", __LINE__);
+                    while(row2 = mysql_fetch_row(res2))
+                    {
+                        if(strcmp(row2[0], row[0]) == 0)
+                        {
+                            if(atoi(row2[5]) == 1)
+                                sta = 1;
+                            else if(atoi(row2[5]) == 0)
+                                sta = 0;
+                        }
+                    }
+                    if(sta == 1)
+                        printf("------%s---在线\n", row[0]);
+                    else if(sta == 0)
+                        printf("------%s---离线\n", row[0]);
+                    //if(atoi(row[5]) == 1)
+                        // printf("------%s\n", row[0]);
+                    //else
+                        //printf("------%s---离线\n", row[0]);
+                }
+                //进入聊天
+                Write(cm.cfd, "---输入用户名，开始聊天(q to quit)\n");
+                read(cm.cfd, buf, sizeof(buf));
+                if(strncmp(buf, "q\n", 2) == 0)
+                {
+                    break;
+                }
+                buf[strlen(buf) - 1] = '\0';
+                ret = mysql_repeat(&cm.mysql, cm.username, buf, 1);
+                if(ret == 0)
+                {
+                    strcpy(cm.tousername, buf);
+                    if(pthread_create(&thid, NULL, func_liaotian, (void *)&cm) == -1)
+                        my_err("pthread_create error", __LINE__);
+                    pthread_join(thid, NULL);
+                    break;
+                }
+                else
+                {
+                    Write(cm.cfd, "---你的好友列表中没有此用户\n");
+                    continue;
+                }
+            }
         }
         else if(strncmp(buf, "2\n", 2) == 0)
         {
-            
+            while(1)
+            {
+                int flag = 0;
+                Write(cm.cfd, "------添加好友(1)/群(2)(q to quit)------\n");
+                Read(cm.cfd, buf, sizeof(buf));
+                if(strncmp(buf, "q\n", 2) == 0)
+                    break;
+                else if(strncmp(buf, "1\n", 2) == 0)
+                {
+                    Write(cm.cfd, "---请输入用户名(q to quit):");
+                    Read(cm.cfd, buf, sizeof(buf));
+                    if(strncmp(buf, "q\n", 2) == 0)
+                        break;
+                    buf[strlen(buf) - 1] = '\0';
+                    //strcpy(buff, buf);
+                    query_str = "select * from UserData";
+                    rows = mysql_real_query(&cm.mysql, query_str, strlen(query_str));
+                    if(rows != 0)
+                        my_err("mysql_real_query", __LINE__);
+                    res = mysql_store_result(&cm.mysql);
+                    if(res == NULL)
+                        my_err("mysql_store_result error", __LINE__);
+                    while(row = mysql_fetch_row(res))
+                    {
+                        if(strcmp(buf, row[0]) == 0)
+                        {
+                            flag = 1;
+                            Write(cm.cfd, "已向对方发送请求，等待对方接受\n");
+                            strcpy(buff, "请求添加你为好友---同意(1)/拒绝(2)---(q to quit)\n");
+                            strcpy(cm.tousername, row[0]);
+                            char duff[BUFSIZ];
+                            sprintf(duff, \
+                                    "insert into OffLineMes values(\"%s\", \"%s\", \"%s\", \"%s\", \"%d\")",\
+                                    get_time(now_time), cm.username, cm.tousername, buff, 1);
+
+                            pthread_mutex_lock(&mutex);
+                                rows = mysql_real_query(&cm.mysql, duff, strlen(duff));
+                                if(rows != 0)
+                                    my_err("mysql_real_query error", __LINE__);
+                            pthread_mutex_unlock(&mutex);
+
+                            newsnum = atoi(row[7]);
+                            newsnum++;
+                            sprintf(duff, \
+                            "update UserData set newsnum = %d where username = \"%s\"", \
+                            newsnum, row[0]);
+
+                            pthread_mutex_lock(&mutex);
+                                rows = mysql_real_query(&cm.mysql, duff, strlen(duff));
+                                if(rows != 0)
+                                    my_err("mysql_real_query error", __LINE__);
+                            pthread_mutex_unlock(&mutex);
+                        }
+                    }
+                    if(flag == 0)
+                        Write(cm.cfd, "没有此用户\n");
+                }
+                else if(strncmp(buf, "2\n", 2) == 0)
+                {
+                    Write(cm.cfd, "---请输入群聊名(q to quit):");
+                    Read(cm.cfd, buf, sizeof(buf));
+                    if(strncmp(buf, "q\n", 2) == 0)
+                        break;
+                    buf[strlen(buf) - 1] = '\0';
+                    strcpy(buff, buf);
+
+
+                }
+            }
         }
         else if(strncmp(buf, "3\n", 2) == 0)
         {
@@ -470,4 +802,89 @@ void *func_yonghu(void *arg)
         }
     }
     pthread_exit(0);
+}
+
+void *func_liaotian(void *arg)
+{
+    struct cfd_mysql cm;
+    cm = *(struct cfd_mysql *)arg;
+    int i = 0;
+    int in = 0, out = 0;     //下标位置
+    int incfd, outcfd;
+    char temp[100];
+    char buf[BUFSIZ];
+    char now_time[100];
+
+    int rows;
+    MYSQL_RES *res;
+    MYSQL_ROW row;
+    strcpy(temp, "select * from UserData");
+    rows = mysql_real_query(&cm.mysql, temp, strlen(temp));
+    if(rows != 0)
+        my_err("mysql_real_query error", __LINE__);
+    res = mysql_store_result(&cm.mysql);
+    if(res == NULL)
+        my_err("mysql_store_result error", __LINE__);
+    while(row = mysql_fetch_row(res))
+    {
+        if(strcmp(cm.username, row[0]) == 0)
+        {    
+            in = atoi(row[4]);
+            incfd = atoi(row[6]);
+        }
+        else if(strcmp(cm.tousername, row[0]) == 0)
+        {
+            out = atoi(row[4]);
+            outcfd = atoi(row[6]);
+        }
+    }
+
+    // pthread_mutex_lock(&mutex);
+    // clients[in] = outcfd;
+    // clients[out] = incfd;
+    // pthread_mutex_unlock(&mutex);
+
+    sprintf(temp, "------%s------(q to quit)\n", cm.tousername);
+    Write(cm.cfd, temp);
+    //Write(cm.cfd, "(q to quit)\n");
+    read(cm.cfd, buf, sizeof(buf));
+    if(strncmp(buf, "q\n", 2) == 0)
+    {
+        pthread_exit(0);
+    }
+    int ret;
+    char infor[BUFSIZ];    
+    // sprintf(infor, "[%s]-<%s>---%s", get_time(now_time), cm.username, buf);
+    // Write(outcfd, infor);
+    while(1)
+    {
+        ret = epoll_wait(epfd, ep, MAXEVE, -1);
+        for(i=0; i<ret; i++)
+        {
+            if(ep[i].data.fd == lfd)
+            {
+                continue;
+            }
+            else
+            {
+                //读套接字
+                if(incfd == ep[i].data.fd)
+                {
+                    Read(incfd, buf, sizeof(buf));
+                    if(strncmp(buf, "q\n", 2) == 0)
+                        pthread_exit(0);
+                    sprintf(infor, "[%s]-<%s>---%s", get_time(now_time), cm.username, buf);
+                    Write(outcfd, infor);
+                }
+                else if(outcfd == ep[i].data.fd)
+                {
+                    Read(outcfd, buf, sizeof(buf));
+                    if(strncmp(buf, "q\n", 2) == 0)
+                        pthread_exit(0);
+                    sprintf(infor, "[%s]-<%s>---%s", get_time(now_time), cm.tousername, buf);
+                    Write(incfd, infor);
+                }
+            }
+        }
+    }
 }

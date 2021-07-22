@@ -16,6 +16,7 @@
 #define INVALID_USERINFO 'n'
 #define VALID_USERINFO 'y'
 
+#define MAXEVE 1024
 
 struct node
 {
@@ -33,6 +34,7 @@ struct cfd_mysql
     struct sockaddr_in clit_addr;
     char username[20];
     char tousername[20];
+    int tocfd;
     int retval;
 };
 
@@ -69,7 +71,8 @@ void friends_interface();
 //错误处理类函数
 //
 void Write(int fd, const char *buf);
-void Read(int fd, void *buf, size_t count); //未有源码
+//简单错误处理
+void Read(int fd, void *buf, size_t count);
 
 
 //
