@@ -72,7 +72,7 @@ void friends_interface();
 //
 void Write(int fd, const char *buf);
 //简单错误处理
-void Read(int fd, void *buf, size_t count);
+int Read(int fd, char *buf, size_t count);
 
 
 //
@@ -109,10 +109,16 @@ void mysql_build(MYSQL *mysql, const char *str);
 //有重复返回0,无重复返回1
 int mysql_repeat(MYSQL *mysql, const char *string, const char *str, int field);
 
+//查询newsnum
+//username是待查询的用户名
+int mysql_inquire_newsnum(MYSQL *mysql, const char *username, int line);
 
 //server多线程函数
 int huitui(const char *buf);
+//输入q的话返回0
+//其它返回1
 int huitui_val(const char *buf);
+
 void *func_zhuce(void *arg);
 void *func_denglu(void *arg);
 void *func_zhaohui(void *arg);

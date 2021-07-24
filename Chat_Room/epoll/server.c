@@ -32,7 +32,7 @@ int main()
     int             rc, fields;
     int             rows;
 
-    pthread_t thid[1000];
+    pthread_t thid;
     int z = 0;
     // int flag = 0;   //线程id的下标
 
@@ -143,12 +143,13 @@ int main()
 
                 printf("ip %s is connect\n", inet_ntoa(clit_addr.sin_addr));
                 Write(cfd, "Welcome to my_server!\n");
+                Write(cfd, "[(1)] 登陆\n[(2)] 注册\n[(3)] 找回密码\n");
             }
             else                        //cfd们满足读事件，有客户端数据写来
             {
                 //读套接字
                 n = read(ep[i].data.fd, buf, sizeof(buf));
-                request[strlen(request)-1] = '\0';
+                // request[strlen(request)-1] = '\0';
                 if(n == 0)
                 {
                     close(ep[i].data.fd);
@@ -156,74 +157,74 @@ int main()
                 }
                 else if(n > 0)
                 {
-                    if(write(STDOUT_FILENO, buf, n) == -1)
-                        my_err("write orror", __LINE__);
+                    // if(write(STDOUT_FILENO, buf, n) == -1)
+                    //     my_err("write orror", __LINE__);
                     cm.cfd = ep[i].data.fd;
                     cm.mysql = mysql;
                     cm.clit_addr = clit_addr;
                     //接受客户端发来的请求，并调用相关函数
                     //strcpy(request, buf);
                     //request[strlen(request)-1] = '\0';
-                    if(strncmp(buf, "2\n", 2) == 0)
+                    if(strncmp(buf, "(2)\n", 4) == 0)
                     {
                         // cm.cfd = ep[i].data.fd;
                         // cm.mysql = mysql;
                         // cm.clit_addr = clit_addr;
                         strcpy(buf, "---开始注册\n");
                         Write(ep[i].data.fd, buf);
-                        if(pthread_create(&thid[z++], NULL, func_zhuce, (void *)&cm) == -1)
+                        if(pthread_create(&thid, NULL, func_zhuce, (void *)&cm) == -1)
                             my_err("pthread_create error\n", __LINE__);
-                        pthread_join(thid[z - 1], &retval);
+                        pthread_join(thid, &retval);
                         if((long)retval == 1)
                         {
                             Write(ep[i].data.fd, "---注册成功\n");
-                            Write(cm.cfd, "[1] 登陆\n[2] 注册\n[3] 找回密码\n");
+                            Write(cm.cfd, "[(1)] 登陆\n[(2)] 注册\n[(3)] 找回密码\n");
                         }
                         else
                         {
                             Write(ep[i].data.fd, "---注册取消\n");
-                            Write(cm.cfd, "[1] 登陆\n[2] 注册\n[3] 找回密码\n");
+                            Write(cm.cfd, "[(1)] 登陆\n[(2)] 注册\n[(3)] 找回密码\n");
                         }
 
                         //Write(cm.cfd, "[1] 登陆\n[2] 注册\n[3] 找回密码\n");
                     }
-                    else if(strncmp(buf, "1\n", 2) == 0)
+                    else if(strncmp(buf, "(1)\n", 4) == 0)
                     {
                         struct cfd_mysql *user;
 
                         Write(ep[i].data.fd, "---开始登陆\n");
-                        if(pthread_create(&thid[z++], NULL, func_denglu, (void *)&cm) == -1)
+                        if(pthread_create(&thid, NULL, func_denglu, (void *)&cm) == -1)
                             my_err("pthread_create error", __LINE__);
-                        pthread_join(thid[z - 1], &retval);
+                        pthread_join(thid, &retval);
                         user = (struct cfd_mysql *)retval;
                         if(user->retval == 1)
                         {
                             Write(cm.cfd, "---登陆成功\n");
                             //进入用户界面
-                            if(pthread_create(&thid[z++], NULL, func_yonghu, (void *)user) == -1)
+                            if(pthread_create(&thid, NULL, func_yonghu, (void *)user) == -1)
                                 my_err("pthread_create error", __LINE__);
                             //continue;
 
                         }
                         else
                         {
-                            Write(cm.cfd, "[1] 登陆\n[2] 注册\n[3] 找回密码\n");
+                            Write(cm.cfd, "[(1)] 登陆\n[(2)] 注册\n[(3)] 找回密码\n");
                         }
                     }
-                    else if(strncmp(buf, "3\n", 2) == 0)
+                    else if(strncmp(buf, "(3)\n", 4) == 0)
                     {
                         Write(ep[i].data.fd, "---开始找回密码\n");
-                        if(pthread_create(&thid[z++], NULL, func_zhaohui, (void *)&cm) == -1)
+                        if(pthread_create(&thid, NULL, func_zhaohui, (void *)&cm) == -1)
                             my_err("pthread_create error", __LINE__);
-                        pthread_join(thid[z - 1], &retval);
+                        pthread_join(thid, &retval);
                         if((long)retval == 1)
                         {
                             Write(cm.cfd, "---密码找回成功\n");
-                            Write(cm.cfd, "[1] 登陆\n[2] 注册\n[3] 找回密码\n");
+                            Write(cm.cfd, "[(1)] 登陆\n[(2)] 注册\n[(3)] 找回密码\n");
                         }
                         else
                         {
-                            Write(cm.cfd, "[1] 登陆\n[2] 注册\n[3] 找回密码\n");
+                            Write(cm.cfd, "[(1)] 登陆\n[(2)] 注册\n[(3)] 找回密码\n");
                         }
                     }
                     else
@@ -255,8 +256,6 @@ int main()
     }
 
 
-    for(i=0; i<100; i++)
-        pthread_join(thid[i], NULL);
 
     for(i=0; i<ret; i++)
         close(ep[i].data.fd);

@@ -1,6 +1,6 @@
 #include "func.h"
 
-
+extern pthread_mutex_t mutex;
 // void mysql_build(MYSQL *mysql, const char *str)
 // {
 //     int rc;
@@ -68,4 +68,24 @@ int mysql_repeat(MYSQL *mysql, const char *string, const char *str, int field)
         }
     }
     return 1;           //无重复
+}
+
+int mysql_inquire_newsnum(MYSQL *mysql, const char *username, int line)
+{
+    MYSQL_ROW row;
+    MYSQL_RES *res;
+    int rows;
+    char buff[BUFSIZ];
+
+    sprintf(buff, "select newsnum from UserData where username = \"%s\"", username);
+    pthread_mutex_lock(&mutex);
+        rows = mysql_real_query(mysql, buff, strlen(buff));
+        if(rows != 0)
+            my_err("mysql_real_query error", line);
+        res = mysql_store_result(mysql);
+        if(res == NULL)
+            my_err("mysql_store_result error", line);
+    pthread_mutex_unlock(&mutex);
+    while(row = mysql_fetch_row(res))
+        return atoi(row[0]);
 }

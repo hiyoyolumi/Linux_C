@@ -69,12 +69,11 @@ int main()
     
 
     //打印服务器发来的欢迎信息
-    read(cfd, buf, sizeof(buf));
-    write(STDOUT_FILENO, buf, strlen(buf));
-
+    // read(cfd, buf, sizeof(buf));
+    // write(STDOUT_FILENO, buf, strlen(buf));
     //welcome_interface(cfd);
     //打印欢迎界面信息
-    welcome();
+    // welcome();
 
     
 
